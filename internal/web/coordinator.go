@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/wyw14/solo-038/internal/sensor"
@@ -25,15 +26,19 @@ func (coordinator *Coordinator) Prepare(owner string, jobGeneration, rollGenerat
 	return coordinator.state.Thread(owner)
 }
 
+// Permit acquires a tension permit from fresh readings. The permit is bound
+// to the fence currently in force, so it cannot be replayed after a roll
+// change, a job change, or a re-thread.
 func (coordinator *Coordinator) Permit(readings []sensor.Reading, tolerance float64, now time.Time) (TensionPermit, error) {
-	return BuildTensionPermit(readings, tolerance, now)
+	fence, ok := coordinator.state.FenceIdentity()
+	if !ok {
+		return TensionPermit{}, fmt.Errorf("cannot acquire tension permit before the web path is fenced")
+	}
+	return BuildTensionPermit(readings, tolerance, fence, now)
 }
 
 func (coordinator *Coordinator) Advance(owner string, meters float64, permit TensionPermit, now time.Time) error {
-	if !permit.ValidAt(now) {
-		return &PermitError{Reason: permit.Reason}
-	}
-	return coordinator.state.Advance(owner, meters)
+	return coordinator.state.Advance(owner, meters, permit, now)
 }
 
 type PermitError struct {

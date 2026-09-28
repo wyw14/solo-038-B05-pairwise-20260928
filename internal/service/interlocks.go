@@ -14,7 +14,7 @@ type Interlock struct {
 
 func (runtime *Runtime) Interlocks() []Interlock {
 	now := time.Now().UTC()
-	_, _, _, threaded, _ := runtime.web.Snapshot()
+	_, _, _, _, threaded, _ := runtime.web.Snapshot()
 	status, _ := runtime.dryerControl.Status()
 	ready, _, _, fault, _ := runtime.folder.Snapshot()
 	values := []Interlock{
