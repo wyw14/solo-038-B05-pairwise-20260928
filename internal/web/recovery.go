@@ -19,6 +19,7 @@ func Restore(state *State, recovery Recovery) error {
 	state.owner = recovery.Owner
 	state.jobGeneration = recovery.JobGeneration
 	state.rollGeneration = recovery.RollGeneration
+	state.fenceEpoch++
 	state.threaded = recovery.Threaded
 	state.meter = recovery.Meter
 	return nil

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"time"
 
 	"github.com/wyw14/solo-038/internal/sensor"
@@ -26,14 +27,29 @@ func (coordinator *Coordinator) Prepare(owner string, jobGeneration, rollGenerat
 }
 
 func (coordinator *Coordinator) Permit(readings []sensor.Reading, tolerance float64, now time.Time) (TensionPermit, error) {
-	return BuildTensionPermit(readings, tolerance, now)
+	permit, err := BuildTensionPermit(readings, tolerance, now)
+	if err != nil {
+		return TensionPermit{}, err
+	}
+	fence := coordinator.state.CurrentFence()
+	permit.Owner = fence.Owner
+	permit.JobGeneration = fence.JobGeneration
+	permit.RollGeneration = fence.RollGeneration
+	permit.FenceEpoch = fence.Epoch
+	return permit, nil
 }
 
 func (coordinator *Coordinator) Advance(owner string, meters float64, permit TensionPermit, now time.Time) error {
 	if !permit.ValidAt(now) {
 		return &PermitError{Reason: permit.Reason}
 	}
-	return coordinator.state.Advance(owner, meters)
+	if err := coordinator.state.Advance(owner, meters, permit.Fence()); err != nil {
+		if errors.Is(err, ErrStaleFence) {
+			return &PermitError{Reason: ErrStaleFence.Error()}
+		}
+		return err
+	}
+	return nil
 }
 
 type PermitError struct {
